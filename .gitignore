@@ -6,3 +6,5 @@ dist/
 Thumbs.db
 .gstack/
 .claude/
+.env.local
+.vercel/
