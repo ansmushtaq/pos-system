@@ -37,7 +37,7 @@ export const login = async (req, res) => {
     }, 'Login successful');
   } catch (err) {
     console.error(err);
-    return error(res, 'An unexpected error occurred');
+    return error(res, 'An unexpected error occurred', 500);
   }
 };
 
