@@ -22,7 +22,6 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "escpos": "^3.0.0-alpha",
     "pdfkit": "^0.15.0"
   },
   "prisma": {

@@ -8,6 +8,7 @@ export interface CartItem {
   unitPrice: number;
   originalUnitPrice: number;
   isPriceOverridden: boolean;
+  priceOverrideToken?: string;
   costPrice: number;
   discount: number;
   totalPrice: number;
@@ -22,7 +23,7 @@ interface CartState {
   addItem: (item: CartItem) => void;
   removeItem: (productId: number) => void;
   updateQuantity: (productId: number, quantity: number) => void;
-  updateUnitPrice: (productId: number, unitPrice: number) => void;
+  updateUnitPrice: (productId: number, unitPrice: number, priceOverrideToken?: string) => void;
   setCustomer: (customerId: number | null, customerName: string) => void;
   setSeller: (sellerId: number | null) => void;
   clearCart: () => void;
@@ -62,11 +63,11 @@ export const useCartStore = create<CartState>((set) => ({
       ),
     })),
 
-  updateUnitPrice: (productId, unitPrice) =>
+  updateUnitPrice: (productId, unitPrice, priceOverrideToken) =>
     set((state) => ({
       items: state.items.map((i) =>
         i.productId === productId
-          ? { ...i, unitPrice, isPriceOverridden: unitPrice !== i.originalUnitPrice, totalPrice: (unitPrice - i.discount) * i.quantity, profitPreview: (unitPrice - i.costPrice - i.discount) * i.quantity }
+          ? { ...i, unitPrice, priceOverrideToken, isPriceOverridden: unitPrice !== i.originalUnitPrice, totalPrice: (unitPrice - i.discount) * i.quantity, profitPreview: (unitPrice - i.costPrice - i.discount) * i.quantity }
           : i
       ),
     })),

@@ -130,7 +130,11 @@ export const clockOutHandler = async (req, res) => {
 
 export const shiftSummary = async (req, res) => {
   try {
-    const summary = await getShiftSummary(Number(req.params.id), req.query.shiftRecordId);
+    const targetId = Number(req.params.id);
+    if (req.user.id !== targetId && req.user.role !== ROLES.ADMIN && req.user.role !== ROLES.MANAGER) {
+      return error(res, 'You can only view your own shift summary', 403);
+    }
+    const summary = await getShiftSummary(targetId, req.query.shiftRecordId);
     return success(res, summary, 'Shift summary fetched');
   } catch (err) {
     console.error(err);

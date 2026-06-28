@@ -1,7 +1,9 @@
 import prisma from '../config/db.js';
-import { PAYMENT_METHODS, SALE_STATUSES, STOCK_REFERENCE_MODELS, CREDIT_TRANSACTION_TYPES, MOVEMENT_TYPES } from '../config/constants.js';
+import jwt from 'jsonwebtoken';
+import { PAYMENT_METHODS, SALE_STATUSES, STOCK_REFERENCE_MODELS, CREDIT_TRANSACTION_TYPES, MOVEMENT_TYPES, PASSCODE_MODULES, ROLES } from '../config/constants.js';
 import { generateInvoiceNumber } from '../utils/generateInvoiceNumber.js';
 import { decrementStock, incrementStock } from './inventory.service.js';
+import { isPasscodeEnabled } from './settings.service.js';
 
 const saleInclude = {
   items: true,
@@ -9,7 +11,54 @@ const saleInclude = {
   customer: { select: { id: true, name: true, phone: true } },
 };
 
-export const createSale = async (saleData, userId) => {
+const canOverridePriceByRole = (role) => role === ROLES.ADMIN || role === ROLES.MANAGER;
+
+const verifyPriceOverrideToken = (token, userId) => {
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.PASSCODE_TOKEN_SECRET || process.env.JWT_SECRET,
+    );
+    return (
+      decoded.purpose === 'passcode' &&
+      decoded.module === PASSCODE_MODULES.PRICE_OVERRIDE &&
+      decoded.userId === userId
+    );
+  } catch {
+    return false;
+  }
+};
+
+const assertPriceOverrideAllowed = async ({ saleData, products, user }) => {
+  if (canOverridePriceByRole(user.role)) return;
+
+  const productMap = Object.fromEntries(products.map((product) => [product.id, product]));
+  const hasOverride = saleData.items.some((item) => {
+    const product = productMap[item.productId];
+    return (
+      item.unitPrice !== undefined && item.unitPrice !== product.salePrice
+    ) || (item.discount ?? 0) > 0;
+  }) || (saleData.discountAmount ?? 0) > 0;
+
+  if (!hasOverride) return;
+
+  const passcodeEnabled = await isPasscodeEnabled(PASSCODE_MODULES.PRICE_OVERRIDE);
+  if (!passcodeEnabled) return;
+
+  const tokens = [
+    saleData.priceOverrideToken,
+    ...saleData.items.map((item) => item.priceOverrideToken),
+  ].filter(Boolean);
+
+  if (!tokens.some((token) => verifyPriceOverrideToken(token, user.id))) {
+    const err = new Error('Price override passcode is required');
+    err.code = 'PRICE_OVERRIDE_REQUIRED';
+    throw err;
+  }
+};
+
+export const createSale = async (saleData, user) => {
+  const userId = user.id;
   return prisma.$transaction(async (tx) => {
     // 0. Offline idempotency — dedup by offlineId
     if (saleData.offlineId) {
@@ -56,6 +105,8 @@ export const createSale = async (saleData, userId) => {
       err.code = 'PRODUCT_NOT_FOUND';
       throw err;
     }
+
+    await assertPriceOverrideAllowed({ saleData, products, user });
 
     const productMap = {};
     for (const p of products) {

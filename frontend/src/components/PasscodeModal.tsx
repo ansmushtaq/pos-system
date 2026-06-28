@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { verifyPasscode } from '../api/settings.api';
+import { verifyPasscode, type PasscodeVerification } from '../api/settings.api';
 
 interface PasscodeModalProps {
   module: string;
-  onSuccess: () => void;
+  onSuccess: (result: PasscodeVerification) => void;
   onCancel: () => void;
 }
 
@@ -17,9 +17,9 @@ export const PasscodeModal = ({ module, onSuccess, onCancel }: PasscodeModalProp
     setError('');
     setLoading(true);
     try {
-      const valid = await verifyPasscode(module, pin);
-      if (valid) {
-        onSuccess();
+      const result = await verifyPasscode(module, pin);
+      if (result.valid) {
+        onSuccess(result);
       } else {
         setError('Invalid PIN');
       }

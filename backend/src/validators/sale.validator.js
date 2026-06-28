@@ -7,6 +7,7 @@ export const createSaleValidator = [
   body('items.*.quantity').isFloat({ min: 0.001 }).withMessage('Quantity must be greater than 0'),
   body('items.*.unitPrice').optional().isFloat({ min: 0 }).withMessage('Unit price must be 0 or greater'),
   body('items.*.discount').optional().isFloat({ min: 0 }).withMessage('Discount must be 0 or greater'),
+  body('items.*.priceOverrideToken').optional().isString().withMessage('Price override token must be a string'),
   body('paymentMethod')
     .isIn(Object.values(PAYMENT_METHODS))
     .withMessage('Valid payment method is required'),
@@ -15,6 +16,7 @@ export const createSaleValidator = [
   body('customerName').optional().isString().trim(),
   body('discountAmount').optional().isFloat({ min: 0 }).withMessage('Discount amount must be 0 or greater'),
   body('taxAmount').optional().isFloat({ min: 0 }).withMessage('Tax amount must be 0 or greater'),
+  body('priceOverrideToken').optional().isString().withMessage('Price override token must be a string'),
   body('notes').optional().isString().trim(),
 ];
 

@@ -9,6 +9,7 @@ export const CartItemRow = ({ item }: { item: CartItemType }) => {
   const [showPasscode, setShowPasscode] = useState(false);
   const [editingPrice, setEditingPrice] = useState(false);
   const [priceInput, setPriceInput] = useState('');
+  const [priceOverrideToken, setPriceOverrideToken] = useState<string | undefined>();
 
   const handlePriceClick = () => {
     setShowPasscode(true);
@@ -16,7 +17,7 @@ export const CartItemRow = ({ item }: { item: CartItemType }) => {
 
   const handlePriceEdit = (newPrice: number) => {
     if (newPrice > 0) {
-      updateUnitPrice(item.productId, newPrice);
+      updateUnitPrice(item.productId, newPrice, priceOverrideToken);
     }
     setEditingPrice(false);
   };
@@ -82,8 +83,9 @@ export const CartItemRow = ({ item }: { item: CartItemType }) => {
       {showPasscode && (
         <PasscodeModal
           module="PRICE_OVERRIDE"
-          onSuccess={() => {
+          onSuccess={(result) => {
             setShowPasscode(false);
+            setPriceOverrideToken(result.passcodeToken);
             setEditingPrice(true);
             setPriceInput(String(item.unitPrice));
           }}

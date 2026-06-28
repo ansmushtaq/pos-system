@@ -1,6 +1,18 @@
 import prisma from '../src/config/db.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { createInventoryRecord } from '../src/services/inventory.service.js';
+
+const getSeedSecret = (envName, generator) => {
+  const value = process.env[envName];
+  if (value) return value;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`${envName} is required when running seeds in production`);
+  }
+  const generated = generator();
+  console.warn(`${envName} was not set. Generated development value: ${generated}`);
+  return generated;
+};
 
 // ─── Categories (25 grocery categories) ──────────────────────────────────────
 const categories = [
@@ -579,11 +591,12 @@ async function main() {
   // ── Seed admin user ────────────────────────────────────────────────────────
   const existingAdmin = await prisma.user.findUnique({ where: { username: 'admin' } });
   if (!existingAdmin) {
-    const passwordHash = await bcrypt.hash('admin123', 10);
+    const adminPassword = getSeedSecret('POS_SEED_ADMIN_PASSWORD', () => crypto.randomBytes(12).toString('base64url'));
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
     await prisma.user.create({
       data: { fullName: 'Administrator', username: 'admin', passwordHash, role: 'ADMIN' },
     });
-    console.log('✓ Default admin created (admin / admin123)');
+    console.log('✓ Default admin created (username: admin)');
   } else {
     console.log('• Admin user already exists — skipping');
   }
@@ -685,7 +698,8 @@ async function main() {
   // ── Seed a cashier user for shift testing ──────────────────────────────────
   const existingCashier = await prisma.user.findUnique({ where: { username: 'cashier' } });
   if (!existingCashier) {
-    const passwordHash = await bcrypt.hash('cashier123', 10);
+    const cashierPassword = getSeedSecret('POS_SEED_CASHIER_PASSWORD', () => crypto.randomBytes(12).toString('base64url'));
+    const passwordHash = await bcrypt.hash(cashierPassword, 10);
     await prisma.user.create({
       data: {
         fullName: 'Ali Hassan',
@@ -695,7 +709,7 @@ async function main() {
         createdById: admin.id,
       },
     });
-    console.log('✓ Cashier user created (cashier / cashier123)');
+    console.log('✓ Cashier user created (username: cashier)');
   } else {
     console.log('• Cashier user already exists — skipping');
   }

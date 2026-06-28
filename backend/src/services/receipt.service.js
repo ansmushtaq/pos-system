@@ -1,12 +1,7 @@
 import { format } from 'date-fns';
-import { createRequire } from 'module';
-import Printer from 'escpos';
 import PDFDocument from 'pdfkit';
 import prisma from '../config/db.js';
 import { PAYMENT_METHODS, SALE_STATUSES } from '../config/constants.js';
-
-const require = createRequire(import.meta.url);
-const getPixels = require('get-pixels');
 
 /**
  * Build receipt JSON data for a given sale ID.
@@ -92,104 +87,71 @@ export const buildReceiptData = async (saleId) => {
   };
 };
 
-const loadEscposImage = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch logo: ${response.status}`);
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const mimeType = response.headers.get('content-type') || 'image/png';
-  const pixels = await new Promise((resolve, reject) => {
-    getPixels(buffer, mimeType, (err, p) => (err ? reject(err) : resolve(p)));
-  });
-  return new Printer.Image(pixels);
-};
-
 /**
  * Build an ESC/POS binary buffer for thermal printer output.
  */
-export const buildEscposBuffer = (receiptData) => {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const fakeAdapter = {
-      write: (buf, cb) => {
-        chunks.push(buf);
-        if (cb) cb(null);
-      },
-      close: (cb) => {
-        if (cb) cb(null);
-      },
-    };
+export const buildEscposBuffer = async (receiptData) => {
+  const chunks = [];
+  const write = (data) => chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8'));
+  const command = (...bytes) => write(Buffer.from(bytes));
+  const text = (value = '') => write(`${value}\n`);
+  const align = (mode) => command(0x1b, 0x61, mode);
+  const bold = (enabled) => command(0x1b, 0x45, enabled ? 1 : 0);
+  const line = () => text('-'.repeat(32));
 
-    const printer = new Printer(fakeAdapter, { encoding: 'UTF8' });
-    const { currencySymbol } = receiptData;
-    const fmt = (v) => `${currencySymbol} ${Number(v).toFixed(2)}`;
+  const { currencySymbol } = receiptData;
+  const fmt = (v) => `${currencySymbol} ${Number(v).toFixed(2)}`;
 
-    const build = async () => {
-      if (receiptData.logoUrl) {
-        try {
-          const image = await loadEscposImage(receiptData.logoUrl);
-          printer.align('CT');
-          await printer.image(image, 'd24');
-        } catch {
-          // Logo load failed — continue without it
-        }
-      }
-
-      printer.align('CT');
-      printer.text(receiptData.shopName);
-      if (receiptData.shopAddress) printer.text(receiptData.shopAddress);
-      if (receiptData.shopPhone) printer.text(receiptData.shopPhone);
-      if (receiptData.receiptHeader) printer.text(receiptData.receiptHeader);
-      printer.align('LT');
-      printer.drawLine();
-      printer.text('Invoice: ' + receiptData.invoiceNumber);
-      printer.text('Date: ' + receiptData.date + '  Time: ' + receiptData.time);
-      printer.text('Cashier: ' + receiptData.cashierName);
-      printer.text('Customer: ' + receiptData.customerName);
-      printer.drawLine();
-      printer.text('Item          Qty  Price  Total');
-      receiptData.items.forEach((item) => {
-        printer.text(item.name.length > 24 ? item.name.substring(0, 21) + '...' : item.name);
-        printer.text('  ' + item.quantity + ' x ' + fmt(item.unitPrice) + '  ' + fmt(item.totalPrice));
-      });
-      printer.drawLine();
-      printer.text('Subtotal: ' + fmt(receiptData.subTotal));
-      if (receiptData.discountAmount > 0) {
-        printer.text('Discount: -' + fmt(receiptData.discountAmount));
-      }
-      if (receiptData.taxAmount > 0) {
-        printer.text('Tax: ' + fmt(receiptData.taxAmount));
-      }
-      printer.style('B');
-      printer.text('TOTAL: ' + fmt(receiptData.totalAmount));
-      printer.style('NORMAL');
-      printer.drawLine();
-      printer.text('Payment: ' + receiptData.paymentMethod);
-      if ((receiptData.paymentMethod === PAYMENT_METHODS.CASH || receiptData.paymentMethod === PAYMENT_METHODS.SEMI_CREDIT) && receiptData.amountTendered > 0) {
-        printer.text('Tendered: ' + fmt(receiptData.amountTendered));
-      }
-      if (receiptData.paymentMethod === PAYMENT_METHODS.CASH) {
-        printer.text('Change: ' + fmt(receiptData.changeGiven));
-      }
-      if (receiptData.amountOnCredit > 0) {
-        printer.text('On Credit: ' + fmt(receiptData.amountOnCredit));
-      }
-      if (receiptData.totalProfit !== null) {
-        printer.text('Profit: ' + fmt(receiptData.totalProfit));
-      }
-      printer.drawLine();
-      printer.align('CT');
-      printer.text(receiptData.receiptFooter);
-      printer.feed(3);
-      printer.cut();
-
-      printer.flush((err) => {
-        if (err) reject(err);
-        else resolve(Buffer.concat(chunks));
-      });
-    };
-
-    build().catch(reject);
+  command(0x1b, 0x40);
+  align(1);
+  text(receiptData.shopName);
+  if (receiptData.shopAddress) text(receiptData.shopAddress);
+  if (receiptData.shopPhone) text(receiptData.shopPhone);
+  if (receiptData.receiptHeader) text(receiptData.receiptHeader);
+  align(0);
+  line();
+  text('Invoice: ' + receiptData.invoiceNumber);
+  text('Date: ' + receiptData.date + '  Time: ' + receiptData.time);
+  text('Cashier: ' + receiptData.cashierName);
+  text('Customer: ' + receiptData.customerName);
+  line();
+  text('Item          Qty  Price  Total');
+  receiptData.items.forEach((item) => {
+    text(item.name.length > 24 ? item.name.substring(0, 21) + '...' : item.name);
+    text('  ' + item.quantity + ' x ' + fmt(item.unitPrice) + '  ' + fmt(item.totalPrice));
   });
+  line();
+  text('Subtotal: ' + fmt(receiptData.subTotal));
+  if (receiptData.discountAmount > 0) {
+    text('Discount: -' + fmt(receiptData.discountAmount));
+  }
+  if (receiptData.taxAmount > 0) {
+    text('Tax: ' + fmt(receiptData.taxAmount));
+  }
+  bold(true);
+  text('TOTAL: ' + fmt(receiptData.totalAmount));
+  bold(false);
+  line();
+  text('Payment: ' + receiptData.paymentMethod);
+  if ((receiptData.paymentMethod === PAYMENT_METHODS.CASH || receiptData.paymentMethod === PAYMENT_METHODS.SEMI_CREDIT) && receiptData.amountTendered > 0) {
+    text('Tendered: ' + fmt(receiptData.amountTendered));
+  }
+  if (receiptData.paymentMethod === PAYMENT_METHODS.CASH) {
+    text('Change: ' + fmt(receiptData.changeGiven));
+  }
+  if (receiptData.amountOnCredit > 0) {
+    text('On Credit: ' + fmt(receiptData.amountOnCredit));
+  }
+  if (receiptData.totalProfit !== null) {
+    text('Profit: ' + fmt(receiptData.totalProfit));
+  }
+  line();
+  align(1);
+  text(receiptData.receiptFooter);
+  command(0x1b, 0x64, 3);
+  command(0x1d, 0x56, 0);
+
+  return Buffer.concat(chunks);
 };
 
 /**

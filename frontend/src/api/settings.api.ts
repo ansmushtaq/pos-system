@@ -12,9 +12,14 @@ export const updateSettings = async (payload: Partial<AppSettings>): Promise<App
   return data.data!;
 };
 
-export const verifyPasscode = async (module: string, pin: string): Promise<boolean> => {
-  const { data } = await axiosInstance.post<ApiResponse<{ valid: boolean }>>('/settings/passcode/verify', { module, pin });
-  return data.data?.valid ?? false;
+export interface PasscodeVerification {
+  valid: boolean;
+  passcodeToken?: string;
+}
+
+export const verifyPasscode = async (module: string, pin: string): Promise<PasscodeVerification> => {
+  const { data } = await axiosInstance.post<ApiResponse<PasscodeVerification>>('/settings/passcode/verify', { module, pin });
+  return data.data ?? { valid: false };
 };
 
 export const setPasscode = async (module: string, pin: string): Promise<{ module: string; isEnabled: boolean }> => {

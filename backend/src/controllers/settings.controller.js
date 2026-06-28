@@ -34,7 +34,7 @@ export const update = async (req, res) => {
 
 export const verify = async (req, res) => {
   try {
-    const result = await verifyPasscode(req.body.module, req.body.pin);
+    const result = await verifyPasscode(req.body.module, req.body.pin, req.user.id);
     return success(res, result, 'Passcode verified');
   } catch (err) {
     console.error(err);

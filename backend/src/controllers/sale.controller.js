@@ -23,11 +23,12 @@ const errorStatusMap = {
   CUSTOMER_NOT_FOUND: 404,
   SALE_NOT_FOUND: 404,
   INVENTORY_NOT_FOUND: 500,
+  PRICE_OVERRIDE_REQUIRED: 403,
 };
 
 export const create = async (req, res) => {
   try {
-    const sale = await createSale(req.body, req.user.id);
+    const sale = await createSale(req.body, req.user);
     return success(res, sale, 'Sale created', 201);
   } catch (err) {
     console.error(err);

@@ -18,6 +18,7 @@ export interface SaleItemPayload {
   quantity: number;
   unitPrice?: number;
   discount?: number;
+  priceOverrideToken?: string;
 }
 
 export interface CreateSalePayload {
@@ -28,6 +29,7 @@ export interface CreateSalePayload {
   customerName?: string;
   discountAmount?: number;
   taxAmount?: number;
+  priceOverrideToken?: string;
   notes?: string;
 }
 

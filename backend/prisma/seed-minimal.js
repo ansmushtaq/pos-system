@@ -1,5 +1,17 @@
 import prisma from '../src/config/db.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+const getSeedSecret = (envName, generator) => {
+  const value = process.env[envName];
+  if (value) return value;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`${envName} is required when running seeds in production`);
+  }
+  const generated = generator();
+  console.warn(`${envName} was not set. Generated development value: ${generated}`);
+  return generated;
+};
 
 // Minimal seeder — one row per table so all columns exist
 // Run: npx prisma db seed  (after switching package.json seed to this file)
@@ -21,7 +33,8 @@ async function main() {
   console.log('AppSettings');
 
   // ── Passcode ──
-  const pinHash = await bcrypt.hash('1234', 10);
+  const seedPin = getSeedSecret('POS_SEED_END_OF_DAY_PIN', () => String(crypto.randomInt(100000, 1000000)));
+  const pinHash = await bcrypt.hash(seedPin, 10);
   await prisma.passcode.upsert({
     where: { module: 'END_OF_DAY' },
     create: { module: 'END_OF_DAY', hash: pinHash, isEnabled: true },
@@ -30,7 +43,8 @@ async function main() {
   console.log('Passcode');
 
   // ── Admin user ──
-  const adminHash = await bcrypt.hash('admin', 10);
+  const adminPassword = getSeedSecret('POS_SEED_ADMIN_PASSWORD', () => crypto.randomBytes(12).toString('base64url'));
+  const adminHash = await bcrypt.hash(adminPassword, 10);
   const admin = await prisma.user.upsert({
     where: { username: 'admin' },
     create: { fullName: 'Admin', username: 'admin', passwordHash: adminHash, role: 'ADMIN' },

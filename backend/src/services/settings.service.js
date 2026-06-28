@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
 import { PASSCODE_MODULES } from '../config/constants.js';
 
@@ -53,7 +54,7 @@ export const updateSettings = async (data) => {
   });
 };
 
-export const verifyPasscode = async (module, pin) => {
+export const verifyPasscode = async (module, pin, userId) => {
   if (!Object.values(PASSCODE_MODULES).includes(module)) {
     return { valid: false };
   }
@@ -68,7 +69,23 @@ export const verifyPasscode = async (module, pin) => {
   }
 
   const valid = await bcrypt.compare(pin, passcode.hash);
-  return { valid };
+  if (!valid) return { valid: false };
+
+  const passcodeToken = jwt.sign(
+    { module, userId, purpose: 'passcode' },
+    process.env.PASSCODE_TOKEN_SECRET || process.env.JWT_SECRET,
+    { expiresIn: '5m' },
+  );
+
+  return { valid: true, passcodeToken };
+};
+
+export const isPasscodeEnabled = async (module) => {
+  const passcode = await prisma.passcode.findUnique({
+    where: { module },
+    select: { isEnabled: true },
+  });
+  return Boolean(passcode?.isEnabled);
 };
 
 export const setPasscode = async (module, pin, userId) => {

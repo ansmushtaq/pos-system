@@ -31,6 +31,7 @@ export const POSScreen = () => {
         quantity: i.quantity,
         unitPrice: i.unitPrice,
         discount: i.discount || undefined,
+        priceOverrideToken: i.priceOverrideToken,
       })),
       paymentMethod: data.paymentMethod as CreateSalePayload['paymentMethod'],
       amountTendered: data.amountTendered,
