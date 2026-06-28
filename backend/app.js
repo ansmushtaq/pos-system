@@ -21,7 +21,8 @@ import receiptRoutes from './src/routes/receipt.routes.js';
 
 const app = express();
 
-app.use(helmet());
+app.set('trust proxy', 1);
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -38,6 +39,7 @@ const limiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
 });
 app.use('/api', limiter);
 
